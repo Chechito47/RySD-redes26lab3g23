@@ -1,8 +1,8 @@
 simple Generator
 {
     parameters:
-        double generationInterval @mutable; // sec
-        int packetByteSize; // bytes
+        double generationInterval @mutable;
+        int packetByteSize;
         @display("i=block/source");
     gates:
         output out;
@@ -11,7 +11,7 @@ simple Generator
 simple Queue
 {
     parameters:
-        int bufferSize; // Para limitar la capacidad
+        int bufferSize;
         @display("i=block/queue;q=buffer");
     gates:
         input in;
@@ -57,7 +57,7 @@ module NodeRx
         }
     connections:
         in --> rxBuffer.in;
-        rxBuffer.out --> { datarate = rxToSinkDatarate; } --> sink.in;
+        rxBuffer.out --> { datarate = parent.rxToSinkDatarate; } --> sink.in; 
 }
 
 network Network
@@ -67,7 +67,6 @@ network Network
         double queueToRxDatarate @unit(bps) = default(1Mbps);
         double linkDelay @unit(s) = default(100us);
         @display("bgl=2");
-        
     submodules:
         nodeTx: NodeTx {
             @display("p=50,100");
@@ -78,8 +77,7 @@ network Network
         nodeRx: NodeRx {
             @display("p=250,100");
         }
-        
     connections:
-        nodeTx.out --> { datarate = txToQueueDatarate; delay = linkDelay; } --> queue.in;
-        queue.out --> { datarate = queueToRxDatarate; delay = linkDelay; } --> nodeRx.in;
+        nodeTx.out --> { datarate = parent.txToQueueDatarate; delay = parent.linkDelay; } --> queue.in;
+        queue.out --> { datarate = parent.queueToRxDatarate; delay = parent.linkDelay; } --> nodeRx.in;
 }
