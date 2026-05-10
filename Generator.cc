@@ -10,7 +10,7 @@ class Generator : public cSimpleModule {
 private:
     cMessage *sendMsgEvent;
     cStdDev transmissionStats;
-    cOutVector packetGenVectr; // Para el grafico
+    cOutVector packetGenVector; // Para el grafico
 public:
     Generator();
     virtual ~Generator();
