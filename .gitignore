@@ -5,6 +5,7 @@
 
 # Ejecutable generado (suele tomar el nombre de la carpeta u otro por defecto)
 redes26lab3g23
+lab3-kickstarter
 
 
 # Directorios generados por la ejecución de OMNeT++
@@ -13,4 +14,7 @@ results/
 *.vec
 *.sca
 *.vci
+caso1.csv
+caso2.csv
+.qtenvrc
 *vscode/
