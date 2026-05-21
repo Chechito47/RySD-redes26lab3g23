@@ -49,6 +49,9 @@ protected:
     virtual void finish();
     virtual void handleMessage(cMessage *msg);
 
+private:
+    void trySend();
+
 };
 
 Define_Module(TransportTx);
