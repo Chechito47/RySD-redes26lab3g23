@@ -51,7 +51,6 @@ protected:
 
 private:
     void trySend();
-
 };
 
 Define_Module(TransportTx);
