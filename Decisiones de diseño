@@ -56,14 +56,13 @@ if (msg->hasPar("ecn") && msg->par("ecn").boolValue()) {
 }
 ```
 
-
 Esto significa que `TransportTx` puede recibir ECN tanto por saturación de la red intermedia como por saturación del receptor, y en ambos casos reduce `cwnd`. Esta doble fuente cubre los dos casos de estudio: Caso 1 (cuello en el receptor) y Caso 2 (cuello en la red).
  
 El umbral del 80% se eligió para dar aviso anticipado: si se esperara al 100%, los ACKs con ECN llegarían demasiado tarde y habría descartes antes de que el transmisor reduzca `cwnd`.
  
 ---
  
-### 3.3.5. ACK por paquete
+### ACK por paquete
  
 Se implementó **ACK por paquete**: `TransportRx` genera un ACK de 20 bytes por cada paquete de datos recibido. Esto maximiza la frecuencia de feedback y permite que `TransportTx` ajuste `cwnd` e `inFlight` con la mayor granularidad posible.
  
@@ -71,7 +70,7 @@ Se implementó **ACK por paquete**: `TransportRx` genera un ACK de 20 bytes por 
  
 ---
  
-### 3.3.6. No se implementa retransmisión
+### No se implementa retransmisión
  
 Si un paquete se pierde en la `queue` intermedia (descartado por buffer lleno), no se retransmite. El mecanismo de ventana regula el envío para *evitar* que los buffers se llenen, pero no recupera pérdidas ya ocurridas.
  
@@ -79,7 +78,7 @@ Si un paquete se pierde en la `queue` intermedia (descartado por buffer lleno), 
  
 ---
  
-### 3.3.7. Mecanismo anti-deadlock: WINDOW_UPDATE
+### Mecanismo anti-deadlock: WINDOW_UPDATE
  
 Existe un caso límite: si `rwnd` llega a 0, `TransportTx` deja de enviar completamente. Si `TransportRx` no genera tráfico nuevo, nunca llega otro ACK y la conexión queda paralizada (*deadlock* de ventana cero).
  
@@ -99,7 +98,7 @@ if (freeSlots > 0 && (bufferSize - (rxBuffer.getLength() + 1)) == 0) {
  
 ---
  
-### 3.3.8. Serialización de envíos con canal ocupado
+### Serialización de envíos con canal ocupado
  
 Tanto `TransportTx` como `TransportRx` usan self-messages para no enviar por un canal ocupado. Antes de cada `send()` se consulta el canal:
  
@@ -116,7 +115,7 @@ Esto es obligatorio en OMNeT++: un `send()` sobre un canal en transmisión abort
 ---
 
 
-### 3.3.9. Métricas registradas
+### Métricas registradas
  
 | Vector / Escalar | Módulo | Descripción |
 |---|---|---|
