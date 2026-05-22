@@ -41,6 +41,9 @@ private:
     cOutVector inFlightVec;
     long droppedPackets;
 
+    // Stability
+    cStdDev effectiveWindowStats;
+
 public:
     TransportTx();
     virtual ~TransportTx();
@@ -83,12 +86,16 @@ void TransportTx::initialize() {
     bufferSizeVec.setName("bufferSize");
     cwndVec.setName("cwnd");
     inFlightVec.setName("inFlight");
+
+    // Stability
+    effectiveWindowStats.setName("effectiveWindowStats");
 }
 
 void TransportTx::finish() {
     // recordScalar guarda metricas de los modulos 
     recordScalar("Dropped packets (TransportTx)", droppedPackets);
     recordScalar("Final cwnd", cwnd);
+    recordScalar("stability (stddev effWin)", effectiveWindowStats.getStddev());
 }
 
 void TransportTx::handleMessage(cMessage *msg) {
@@ -121,6 +128,9 @@ void TransportTx::handleMessage(cMessage *msg) {
 
         cwndVec.record(cwnd);
         inFlightVec.record(inFlight);
+
+        double eff = std::min((double)rwnd, cwnd);
+        effectiveWindowStats.collect(eff);
 
         //std::cout << "TIEMPO " << simTime() << " Llegó ACK. inFlight antes=" << inFlight << " cwnd antes=" << cwnd << std::endl;
 
