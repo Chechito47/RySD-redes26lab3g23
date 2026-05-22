@@ -122,7 +122,7 @@ void TransportTx::handleMessage(cMessage *msg) {
         cwndVec.record(cwnd);
         inFlightVec.record(inFlight);
 
-        std::cout << "TIEMPO " << simTime() << " Llegó ACK. inFlight antes=" << inFlight << " cwnd antes=" << cwnd << std::endl;
+        //std::cout << "TIEMPO " << simTime() << " Llegó ACK. inFlight antes=" << inFlight << " cwnd antes=" << cwnd << std::endl;
 
         delete msg;
 
@@ -168,7 +168,7 @@ void TransportTx::trySend() {
         // Sacar el paquete del buffer y enviarlo
         cPacket *pkt = check_and_cast<cPacket *>(txBuffer.pop());
         pkt->setKind(DATA);
-        std::cout << "TIEMPO " << simTime() << " Enviando paquete. inFlight=" << inFlight << " cwnd=" << cwnd << " rwnd=" << rwnd << std::endl;
+        //std::cout << "TIEMPO " << simTime() << " Enviando paquete. inFlight=" << inFlight << " cwnd=" << cwnd << " rwnd=" << rwnd << std::endl;
         send(pkt, "toOut$o");
  
         inFlight++;

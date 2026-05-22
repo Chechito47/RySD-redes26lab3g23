@@ -122,6 +122,10 @@ void TransportRx::handleMessage(cMessage *msg) {
 
         // Calcular si hay congestion (buffer supera el umbral ECN)
         bool ecn = (rxBuffer.getLength() >= (int)(bufferSize * ECN_THRESHOLD));
+        // Propagamos ECN si venia marcado en el paquete
+        if (msg->hasPar("ecn") && msg->par("ecn").boolValue()) {
+            ecn = true;
+        }
 
         // Generar ACK informando espacio libre y señal ECN
         generateAck(ecn);

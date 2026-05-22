@@ -62,6 +62,13 @@ void Queue::handleMessage(cMessage *msg) {
             //Casteo seguro de OMNeT++
             cPacket *pkt = check_and_cast<cPacket *>(buffer.pop());
 
+            // Marcar ECN si el buffer supera el 80%
+            bool ecn = (buffer.getLength() >= (int)(bufferSize * 0.8));
+            if (!pkt->hasPar("ecn")) {
+                pkt->addPar("ecn") = ecn;
+            } else {
+                pkt->par("ecn") = ecn;
+}
             //Busco el canal de salida para calcular cuanto tarda en transmitir este paquete
             cChannel *channel = gate("out")->findTransmissionChannel();
             //Si hay canal calculo la duracion según tamaño del paquete, sino 0
