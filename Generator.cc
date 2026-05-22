@@ -11,6 +11,7 @@ private:
     cMessage *sendMsgEvent;
     cStdDev transmissionStats;
     cOutVector packetGenVector; // Para el grafico
+    long packetsGenerated;      // Lossrate
 public:
     Generator();
     virtual ~Generator();
@@ -23,7 +24,7 @@ Define_Module(Generator);
 
 Generator::Generator() {
     sendMsgEvent = NULL;
-
+    packetsGenerated = 0;
 }
 
 Generator::~Generator() {
@@ -42,6 +43,7 @@ void Generator::initialize() {
 }
 
 void Generator::finish() {
+    recordScalar("Packets generated", packetsGenerated);
 }
 
 void Generator::handleMessage(cMessage *msg) {
@@ -59,6 +61,9 @@ void Generator::handleMessage(cMessage *msg) {
 
     // Registro el evento de generación de paquete
     packetGenVector.record(1); 
+
+    // Cuento los paquetes generados
+    packetsGenerated++;
 
     // compute the new departure time
     simtime_t departureTime = simTime() + par("generationInterval");
