@@ -37,6 +37,10 @@ void Sink::finish(){
     // stats record at the end of simulation
     recordScalar("Avg delay", delayStats.getMean());
     recordScalar("Number of packets", delayStats.getCount());
+
+    // Goodput: packets per second
+    double goodput = delayStats.getCount() / 200.0;
+    recordScalar("Goodput (pkt/s)", goodput);
 }
 
 void Sink::handleMessage(cMessage * msg) {

@@ -10,6 +10,7 @@
 
 #include <string.h>
 #include <omnetpp.h>
+#include <iostream>
 
 using namespace omnetpp;
 
@@ -40,6 +41,9 @@ private:
     cOutVector inFlightVec;
     long droppedPackets;
 
+    // Stability
+    cStdDev effectiveWindowStats;
+
 public:
     TransportTx();
     virtual ~TransportTx();
@@ -64,6 +68,8 @@ TransportTx::~TransportTx() {
 }
 
 void TransportTx::initialize() {
+    //std::cout << "TransportTx::initialize() llamado. inFlight=" << inFlight << " cwnd=" << cwnd << " rwnd=" << rwnd << std::endl;
+
     txBuffer.setName("txBuffer");
     bufferSize = par("bufferSize");
     droppedPackets = 0;
@@ -71,7 +77,7 @@ void TransportTx::initialize() {
     // Valores iniciales 
     cwnd = 1.0; // Slow start
     rwnd = 10;  // Asumo que el receptor tiene espacio hasta recibir el primer ACK
-    inFlight = 10;
+    inFlight = 0; //Comienzo sin paquetes en viaje
 
     // timer interno para serializar envios
     sendEvent = new cMessage("sendEvent");
@@ -80,15 +86,21 @@ void TransportTx::initialize() {
     bufferSizeVec.setName("bufferSize");
     cwndVec.setName("cwnd");
     inFlightVec.setName("inFlight");
+
+    // Stability
+    effectiveWindowStats.setName("effectiveWindowStats");
 }
 
 void TransportTx::finish() {
     // recordScalar guarda metricas de los modulos 
     recordScalar("Dropped packets (TransportTx)", droppedPackets);
     recordScalar("Final cwnd", cwnd);
+    recordScalar("stability (stddev effWin)", effectiveWindowStats.getStddev());
 }
 
 void TransportTx::handleMessage(cMessage *msg) {
+    //std::cout << "TIEMPO " << simTime() << " handleMessage() llamado, kind=" << msg->getKind() << std::endl;
+
     // Caso 1: lleog un ACK / WINDOW_UPDATE desde TransportRx
     // Entra por toOut$i (el lado $i del gate inout)
     if (msg->getKind() == ACK || msg->getKind() == WINDOW_UPDATE) {
@@ -116,6 +128,11 @@ void TransportTx::handleMessage(cMessage *msg) {
 
         cwndVec.record(cwnd);
         inFlightVec.record(inFlight);
+
+        double eff = std::min((double)rwnd, cwnd);
+        effectiveWindowStats.collect(eff);
+
+        //std::cout << "TIEMPO " << simTime() << " Llegó ACK. inFlight antes=" << inFlight << " cwnd antes=" << cwnd << std::endl;
 
         delete msg;
 
@@ -161,6 +178,7 @@ void TransportTx::trySend() {
         // Sacar el paquete del buffer y enviarlo
         cPacket *pkt = check_and_cast<cPacket *>(txBuffer.pop());
         pkt->setKind(DATA);
+        //std::cout << "TIEMPO " << simTime() << " Enviando paquete. inFlight=" << inFlight << " cwnd=" << cwnd << " rwnd=" << rwnd << std::endl;
         send(pkt, "toOut$o");
  
         inFlight++;
