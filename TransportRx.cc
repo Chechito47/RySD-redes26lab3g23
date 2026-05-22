@@ -200,6 +200,19 @@ void TransportRx::trySendToSink() {
     cPacket *pkt = check_and_cast<cPacket *>(rxBuffer.pop());
     send(pkt, "toApp");
     bufferSizeVec.record(rxBuffer.getLength());
+
+    // Si el buffer estaba lleno (rwnd era 0) y ahora tiene espacio, notificar al transmisor
+    int freeSlots = bufferSize - rxBuffer.getLength();
+    if (freeSlots > 0 && (bufferSize - (rxBuffer.getLength() + 1)) == 0) {
+        // Habia 0 slots libres antes, ahora hay 1 → mandar WINDOW_UPDATE
+        cPacket *wu = new cPacket("windowUpdate");
+        wu->setByteLength(20);
+        wu->setKind(WINDOW_UPDATE);
+        wu->addPar("rwnd") = freeSlots;
+        wu->addPar("ecn") = false;
+        feedbackQueue.insert(wu);
+        trySendFeedback();
+    }
  
     // Si quedan más paquetes, programar el siguiente envío
     if (!rxBuffer.isEmpty()) {
