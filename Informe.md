@@ -31,6 +31,9 @@ Para modelar un entorno físico realista, se programaron paquetes con un tamaño
 
 Sobre esta arquitectura, se ejecutó un análisis experimental variando la carga ofrecida mediante el intervalo de generación exponencial de tráfico (con medias de gi igual a 0.1s, 0.2s, 0.5s y 1.0s). El objetivo fue contrastar dos escenarios de saturación independientes: el Caso 1, donde el cuello de botella físico se ubica en la tasa de consumo del receptor final (evaluando dinámicas de Control de Flujo), y el Caso 2, donde la restricción de datarate radica en el enlace intermedio (evaluando dinámicas de Control de Congestión). El análisis de las series temporales extraídas permitió verificar los regímenes de estabilidad e inestabilidad predichos por la teoría de colas, identificando con precisión la ubicación de los desbordamientos de memoria y su impacto en el rendimiento efectivo (throughput) de la red.
 
+### Resumen Parte 2
+[COMPLETAR]
+
 ---
 
 ## 2. Introducción
@@ -52,6 +55,14 @@ En la primera parte del trabajo de laboratorio utilizamos la simulación para es
 * Medir demora, ocupación de buffers y pérdida de paquetes.
 * Distinguir entre problemas de control de flujo y problemas de control de congestión.
 * Analizar resultados experimentales y justificar conclusiones en un informe.
+
+Ya para la segunda parte se incorporó una estrategia de control por ventanas inspirada en TCP, sin modificar la tasa de generación del emisor. La idea fue que `TransportTx` regule cuántos paquetes puede mantener en vuelo usando una ventana efectiva, para reducir la saturación de buffers y las pérdidas asociadas.
+
+**Objetivos Parte 2** <br>
+* Implementar un mecanismo de control por ventanas en `TransportTx`.
+* Limitar la cantidad de paquetes en vuelo mediante `cwnd`, `rwnd` y `effectiveWindow`.
+* Comparar el comportamiento con y sin control en ambos casos de estudio.
+* Analizar el efecto del control sobre pérdidas, ocupación de buffers, demora y rendimiento.
 
 
 ---
@@ -98,13 +109,49 @@ En `omnetpp.ini` se definieron dos casos para aislar el origen del cuello de bot
 
 En ambos casos, la carga ofrecida se controla con `gi`, y la diferencia clave es dónde se ubica la restricción de tasa.
 
+### 3.2. Extensión para la Parte 2: Control por Ventanas
+
+Para la segunda parte del laboratorio se extendió el modelo de transporte con un control por ventanas inspirado en TCP, pero simplificado para este trabajo. La idea fue que `TransportTx` no envíe inmediatamente todo lo recibido del generador, sino que mantenga un buffer de transmisión y autorice el envío solo cuando la cantidad de paquetes en vuelo lo permita.
+
+La ventana efectiva se define como el mínimo entre la ventana de congestión (`cwnd`) y la ventana anunciada por el receptor (`rwnd`):
+
+$$
+effectiveWindow = \min(cwnd, rwnd)
+$$
+
+De ese modo, el transmisor regula su ritmo sin cambiar la tasa de producción del generador.
+
+En esta segunda parte también se incorporaron nuevos módulos y atributos para soportar el control por ventanas:
+
+* **`TransportTx`**: mantiene `bufferSize`, `cwnd`, `rwnd`, `effectiveWindow` e `inFlight`, y decide cuándo enviar o esperar.
+* **`TransportRx`**: genera ACKs y actualiza `rwnd`; además puede propagar la señal de congestión.
+* **Atributos de control en los mensajes**: `ecn`, `rwnd` y la información de actualización de ventana asociada a los ACKs.
+* **Mensajes de control**: ACK por paquete y `WINDOW_UPDATE` cuando el receptor recupera espacio libre.
+
+### 3.3. Retroalimentación y Métricas de la Parte 2
+
+La retroalimentación viaja en ACKs generados por `TransportRx`. Esos mensajes transportan la información necesaria para actualizar la ventana del transmisor y reflejan el estado del receptor y de la red. Cuando corresponde, también se propaga una señal de congestión para que `TransportTx` reduzca su envío.
+
+Para esta parte se registraron además nuevas métricas temporales:
+* `rwnd`: ventana disponible en el receptor.
+* `cwnd`: ventana de congestión del transmisor.
+* `effectiveWindow`: ventana efectiva usada para autorizar el envío.
+* `inFlight`: paquetes actualmente en vuelo.
+
+Estas variables permiten describir el mecanismo de control sin entrar todavía en el análisis detallado de sus ventajas y limitaciones.
+
+### 3.4. Libertades de Diseño del Control por Ventanas
+
+Además de los elementos obligatorios del modelo, para la Parte 2 se tomaron algunas decisiones de diseño propias para simplificar el mecanismo y hacerlo estable en este laboratorio. En particular, se adoptó `ACK` por paquete, una reducción multiplicativa de `cwnd` ante congestión, y una actualización directa de `rwnd` a partir del estado del receptor. También se evitó implementar retransmisión, ya que el objetivo principal fue regular el envío para prevenir pérdidas y no recuperarlas después.
+
+
 ---
 
 ## 4. Resultados: Gráficas y Observaciones
 
 ### 4.1. Resultados Experimentales (Parte 1)
 
-Los datos crudos de las simulaciones fueron extraídos desde los vectores temporales de OMNeT++ hacia archivos CSV (`caso1.csv` y `caso2.csv`). A continuación se presentan las gráficas de las métricas obligatorias para los distintos intervalos de generación ($gi \in \{0.1\text{s}, 0.2\text{s}, 0.5\text{s}, 1.0\text{s}\}$).
+Los datos crudos de las simulaciones fueron extraídos desde los vectores temporales de OMNeT++ hacia archivos CSV (`caso1_sin_control.csv` y `caso2_sin_control.csv`). A continuación se presentan las gráficas de las métricas obligatorias para los distintos intervalos de generación ($gi \in \{0.1\text{s}, 0.2\text{s}, 0.5\text{s}, 1.0\text{s}\}$).
 
 #### 4.1.1. Ocupación del Buffer de Transmisión (`nodeTx.txBuffer`)
 
@@ -171,6 +218,54 @@ Los datos crudos de las simulaciones fueron extraídos desde los vectores tempor
 ![Throughput Caso 2](graficos/Caso2_Congestion_5_Rendimiento.png)
 
 > **Observación:** En ambos experimentos, se observa que la carga útil recibida crece con una relación lineal idéntica a la carga ofrecida en el tramo de 1 a 5 paquetes por segundo. Al alcanzar la carga ofrecida de **10 paquetes/s** ($gi = 0.1\text{ s}$), la curva experimenta un quiebre y se aplana estrictamente de forma horizontal sobre la cota del límite de enlace físico de **5 paquetes/s**.
+
+---
+
+### 4.2. Resultados Experimentales (Parte 2)
+
+En la segunda parte se reutilizaron los mismos parámetros y los mismos dos casos de estudio, pero ahora comparando el comportamiento sin control frente al comportamiento con control por ventanas. Esta sección queda preparada para incorporar las figuras pedidas en el punto 7 y luego apoyar la discusión de la Parte 2.
+
+#### 4.2.1. Ocupación de Buffers
+
+##### Caso 1: Sin control vs. con control
+![Caso 1 - Buffer TX sin control](graficos/Parte2_Caso1_SinControl_Ocupacion_Tx.png)
+![Caso 1 - Buffer TX con control](graficos/Parte2_Caso1_ConControl_Ocupacion_Tx.png)
+![Caso 1 - Ocupación del receptor comparativa](graficos/Parte2_Caso1_OcupacionReceptor_Comparativa.png)
+
+##### Caso 2: Sin control vs. con control
+![Caso 2 - Buffer TX sin control](graficos/Parte2_Caso2_SinControl_Ocupacion_Tx.png)
+![Caso 2 - Buffer TX con control](graficos/Parte2_Caso2_ConControl_Ocupacion_Tx.png)
+![Caso 2 - Cola intermedia comparativa](graficos/Parte2_Caso2_OcupacionCola_Comparativa.png)
+
+> **Nota:** en el Caso 1 la comparación del cuello de botella se hace sobre el receptor (`nodeRx`); en el Caso 2, sobre la cola intermedia (`Network.queue`).
+
+#### 4.2.2. Pérdidas de Paquetes
+
+##### Caso 1
+![Caso 1 - Descartes sin control](graficos/Parte2_Caso1_SinControl_Descartes.png)
+![Caso 1 - Descartes con control](graficos/Parte2_Caso1_ConControl_Descartes.png)
+
+##### Caso 2
+![Caso 2 - Descartes sin control](graficos/Parte2_Caso2_SinControl_Descartes.png)
+![Caso 2 - Descartes con control](graficos/Parte2_Caso2_ConControl_Descartes.png)
+
+#### 4.2.3. Carga Ofrecida vs. Carga Útil
+
+La figura final de esta subsección debería permitir comparar, en una sola gráfica, al menos cuatro curvas: Caso 1 sin control, Caso 1 con control, Caso 2 sin control y Caso 2 con control. Si se añade una curva de límite teórico, debe explicarse que corresponde al throughput máximo impuesto por el enlace de menor tasa.
+
+#### 4.2.4. Demora
+
+![Caso 1 - Delay](graficos/Parte2_Caso1_Delay.png)
+![Caso 2 - Delay](graficos/Parte2_Caso2_Delay.png)
+
+#### 4.2.5. Evolución de las Variables de Control
+
+![Caso 1 - cwnd](graficos/Parte2_Caso1_cwnd.png)
+![Caso 1 - inFlight](graficos/Parte2_Caso1_inFlight.png)
+![Caso 2 - cwnd](graficos/Parte2_Caso2_cwnd.png)
+![Caso 2 - inFlight](graficos/Parte2_Caso2_inFlight.png)
+
+> **Nota:** cuando estén disponibles las series de `rwnd` y `effectiveWindow`, conviene agregarlas en esta misma subsección para mostrar la ventana anunciada, la ventana de congestión y la ventana efectiva en una sola comparación.
 
 ---
 
