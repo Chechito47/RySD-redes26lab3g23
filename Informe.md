@@ -32,7 +32,10 @@ Para modelar un entorno físico realista, se programaron paquetes con un tamaño
 Sobre esta arquitectura, se ejecutó un análisis experimental variando la carga ofrecida mediante el intervalo de generación exponencial de tráfico (con medias de gi igual a 0.1s, 0.2s, 0.5s y 1.0s). El objetivo fue contrastar dos escenarios de saturación independientes: el Caso 1, donde el cuello de botella físico se ubica en la tasa de consumo del receptor final (evaluando dinámicas de Control de Flujo), y el Caso 2, donde la restricción de datarate radica en el enlace intermedio (evaluando dinámicas de Control de Congestión). El análisis de las series temporales extraídas permitió verificar los regímenes de estabilidad e inestabilidad predichos por la teoría de colas, identificando con precisión la ubicación de los desbordamientos de memoria y su impacto en el rendimiento efectivo (throughput) de la red.
 
 ### Resumen Parte 2
-[COMPLETAR]
+
+En la segunda parte del laboratorio se extendió el modelo de transporte incorporando un mecanismo de control por ventanas inspirado en TCP, con el objetivo de comparar el comportamiento de la red sin control frente al caso con control activado. Para ello se agregaron variables como `cwnd`, `rwnd`, `effectiveWindow` e `inFlight`, junto con una lógica de realimentación basada en ACKs que permite regular la cantidad de paquetes en vuelo sin modificar la tasa de generación del emisor.
+
+A partir de esta extensión se repitieron los dos casos de estudio de la Parte 1, ahora evaluando cómo cambia la dinámica de los buffers y el rendimiento cuando el transmisor se autolimita según la ventana efectiva. Los resultados muestran que el control evita el colapso de los buffers críticos y elimina las pérdidas observadas sin control, aunque a costa de desplazar parte de la carga hacia el buffer del transmisor. En el Caso 1, donde el cuello de botella está en el receptor, el control de flujo resulta efectivo para contener la saturación; en el Caso 2, donde el problema está en la red intermedia, el control de congestión frena el envío ante señales de ocupación elevada y mantiene estable la operación del sistema.
 
 ---
 
@@ -223,21 +226,27 @@ Los datos crudos de las simulaciones fueron extraídos desde los vectores tempor
 
 ### 4.2. Resultados Experimentales (Parte 2)
 
-En la segunda parte se reutilizaron los mismos parámetros y los mismos dos casos de estudio, pero ahora comparando el comportamiento sin control frente al comportamiento con control por ventanas. Esta sección queda preparada para incorporar las figuras pedidas en el punto 7 y luego apoyar la discusión de la Parte 2.
+En la segunda parte se reutilizaron los mismos parámetros y los mismos dos casos de estudio, pero ahora comparando el comportamiento sin control frente al comportamiento con control por ventanas. 
 
 #### 4.2.1. Ocupación de Buffers
 
 ##### Caso 1: Sin control vs. con control
-![Caso 1 - Buffer TX sin control](graficos/Parte2_Caso1_SinControl_Ocupacion_Tx.png)
-![Caso 1 - Buffer TX con control](graficos/Parte2_Caso1_ConControl_Ocupacion_Tx.png)
-![Caso 1 - Ocupación del receptor comparativa](graficos/Parte2_Caso1_OcupacionReceptor_Comparativa.png)
+
+![Caso 1 - Grid 3x2 (Tx/Queue/Rx) Sin/Con](graficos/Parte2_Caso1_Grid3x2.png)
+![Caso 1 - Zoom gi=0.1 (Tx vs Rx)](graficos/Parte2_Caso1_Zoom_gi01_Tx_Rx.png)
+
+> **Observación:** En las gráficas revisadas, el `nodeRx` (receptor) oscila entre 0 y 1 paquete y no muestra acumulación sostenida: el receptor, en sí, no presenta problema de desbordo.
+> Por el contrario, la cola de la red intermedia sí muestra comportamiento crítico cuando el control está desactivado: sin control la `Network.queue` colapsa alcanzando el límite de **200 paquetes** y se observan pérdidas acumuladas. Cuando se activa el control por ventanas, las curvas correspondientes a $gi=0.1$ y $gi=0.2$ quedan casi superpuestas; ambas empiezan a llenar la cola pero NO llegan al techo físico de 200 paquetes. En ese escenario con control, el exceso de carga se desplaza hacia el buffer del transmisor (`TransportTx`), que retiene más paquetes (lo que se traduce en pendientes mayores en la curva de ocupación del transmisor) porque el envío efectivo se hace más lento.
+> En la comparativa de throughput esa transferencia de carga se aprecia claramente: gracias al control por ventanas la red intermedia deja de colapsar aunque parte de la carga se acumule en el transmisor.
 
 ##### Caso 2: Sin control vs. con control
-![Caso 2 - Buffer TX sin control](graficos/Parte2_Caso2_SinControl_Ocupacion_Tx.png)
-![Caso 2 - Buffer TX con control](graficos/Parte2_Caso2_ConControl_Ocupacion_Tx.png)
-![Caso 2 - Cola intermedia comparativa](graficos/Parte2_Caso2_OcupacionCola_Comparativa.png)
 
-> **Nota:** en el Caso 1 la comparación del cuello de botella se hace sobre el receptor (`nodeRx`); en el Caso 2, sobre la cola intermedia (`Network.queue`).
+![Caso 2 - Grid 3x2 (Tx/Queue/Rx) Sin/Con](graficos/Parte2_Caso2_Grid3x2.png)
+![Caso 2 - Zoom gi=0.1 (Tx vs Queue)](graficos/Parte2_Caso2_Zoom_gi01_Tx_Queue.png)
+
+> **Observación:** En la subred intermedia, el cuello de botella en $0.5\text{ Mbps}$ pone de manifiesto por qué hace falta control de congestión.
+> En las ejecuciones sin control la `Network.queue` colapsa (llegando al límite de 200 paquetes y generando pérdidas). Con control, en cambio, las curvas de $gi=0.1$ y $gi=0.2$ quedan prácticamente superpuestas: ambas comienzan a llenar la cola pero no alcanzan el límite de 200 paquetes. El efecto observado es que el transmisor (`TransportTx`) asume la acumulación: su buffer crece con pendientes mayores porque envía a menor ritmo efectivo.
+> Por tanto, al activar `cwnd` la red intermedia deja de colapsar y se reduce la pérdida, aunque ello implique mayor retención temporal en el transmisor; esto es claramente visible en la comparativa de throughput.
 
 #### 4.2.2. Pérdidas de Paquetes
 
@@ -249,23 +258,30 @@ En la segunda parte se reutilizaron los mismos parámetros y los mismos dos caso
 ![Caso 2 - Descartes sin control](graficos/Parte2_Caso2_SinControl_Descartes.png)
 ![Caso 2 - Descartes con control](graficos/Parte2_Caso2_ConControl_Descartes.png)
 
+> **Observación:** Tanto para el control de flujo y el control de congestión, podemos observar que el algoritmo aplicado fue efectivo para cualquier tasa de inyección inicial, deshaciéndonos del problema de la pérdida de paquetes en absoluto. 
+
 #### 4.2.3. Carga Ofrecida vs. Carga Útil
 
-La figura final de esta subsección debería permitir comparar, en una sola gráfica, al menos cuatro curvas: Caso 1 sin control, Caso 1 con control, Caso 2 sin control y Caso 2 con control. Si se añade una curva de límite teórico, debe explicarse que corresponde al throughput máximo impuesto por el enlace de menor tasa.
+![Parte 2 - Throughput 4 Curvas](graficos/Parte2_Throughput_4Curvas_Comparativo.png)
 
-#### 4.2.4. Demora
+> **Interpretación de Resultados:** 
+> Como se evidencia en la gráfica, el Algoritmo de Control de Ventanas no incrementa el límite físico de transmisión (todas las curvas saturan asintóticamente en 5 pkt/s). Sin embargo, el éxito del algoritmo introducido en la Parte 2 radica en cómo se alcanza ese límite: mientras que los Casos Sin Control logran 5 pkt/s colapsando las memorias intermedias y perdiendo cientos de paquetes, los Casos Con Control sostienen el mismo Goodput máximo histórico, pero garantizando cero pérdidas y colas descongestionadas en la red, optimizando el comportamiento del sistema global.
 
-![Caso 1 - Delay](graficos/Parte2_Caso1_Delay.png)
-![Caso 2 - Delay](graficos/Parte2_Caso2_Delay.png)
 
-#### 4.2.5. Evolución de las Variables de Control
+#### 4.2.4. Evolución de las Variables de Control
 
 ![Caso 1 - cwnd](graficos/Parte2_Caso1_cwnd.png)
 ![Caso 1 - inFlight](graficos/Parte2_Caso1_inFlight.png)
 ![Caso 2 - cwnd](graficos/Parte2_Caso2_cwnd.png)
 ![Caso 2 - inFlight](graficos/Parte2_Caso2_inFlight.png)
 
-> **Nota:** cuando estén disponibles las series de `rwnd` y `effectiveWindow`, conviene agregarlas en esta misma subsección para mostrar la ventana anunciada, la ventana de congestión y la ventana efectiva en una sola comparación.
+> **Observación:** Las curvas de `cwnd` e `inFlight` muestran una diferencia fundamental entre los dos casos, reflejando cómo el protocolo se adapta según dónde esté el cuello de botella.
+>
+> **Caso 1 (Cuello de botella en el receptor):** El `cwnd` crece de manera sostenida, alcanzando valores cercanos a **~49 paquetes**. Esto ocurre porque la cola intermedia `Network.queue` nunca satura—oscila entre 0 y 1 paquete—, por lo que el protocolo nunca recibe señal de congestión (ECN). Sin detección de congestión, el crecimiento aditivo avanza sin freno hasta que `rwnd` (anunciada por el receptor) limita el envío. El `inFlight` se estabiliza alrededor de 10 paquetes. Así, el transmisor retiene el exceso de tráfico localmente en su buffer, validando que el control de flujo funciona: el problema se desplaza hacia el origen, no al receptor.
+>
+> **Caso 2 (Cuello de botella en la red intermedia):** El comportamiento es radicalmente distinto. Cuando la red intermedia se llena (buffer ≥ 80%), la marca ECN dispara la reducción multiplicativa en `cwnd`. Los datos muestran que en Caso 2 el `cwnd` crece lentamente y no alcanza los mismos valores que Caso 1: queda en torno a **~45 (para gi=0.1/0.2) frente a ~49 en Caso 1**. El `inFlight` se estabiliza en un valor mucho menor, suficiente para saturar el enlace de 0.5 Mbps (~5 pkt/s) sin causar desbordamiento. Este comportamiento conservador es la clave: el protocolo frena el envío antes de que la red colapse.
+>
+> En ambos casos, cuando el sistema alcanza su límite físico, las variables de control se estabilizan en un "punto de equilibrio" donde el protocolo mantiene ocupado el enlace sin desbordarlo, demostrando la efectividad del mecanismo de control por ventanas.
 
 ---
 
@@ -300,6 +316,147 @@ Nos basamos en tres evidencias claras:
 2. **Vistas con zoom:** el nodo que no está limitado se mantiene estable, con pulsos cortos entre 0 y 1 paquete.
 3. **Dónde hay pérdidas (`packetDrops`):** en Caso 1 los descartes aparecen en el receptor; en Caso 2 aparecen en la cola intermedia. Los valores máximos (799 para $gi=0.1\text{ s}$ y 652 para $gi=0.2\text{ s}$) coinciden con esa interpretación.
 
+
+### 5.2. Respuestas a las Preguntas de Análisis (Parte 2)
+
+#### 1. ¿Cómo implementaron rwnd, cwnd y effectiveWindow?
+
+La ventana efectiva (`effectiveWindow`) es el concepto central del protocolo. Se implementa como:
+
+$$
+\text{effectiveWindow} = \min(\text{cwnd}, \text{rwnd})
+$$
+
+donde:
+* **`cwnd` (Congestion Window):** Inicializa en 1 paquete y está bajo control del transmisor. Crece de forma aditiva cuando no hay congestión (`cwnd += 1/cwnd` por ACK recibido sin ECN) y se reduce multiplicativamente cuando se detecta congestión (`cwnd = cwnd / 2`). En el código de `TransportTx.cc` se ve claramente en la función `handleMessage()`.
+* **`rwnd` (Receiver Window):** El receptor la anuncia en cada ACK. Se calcula como el espacio libre en el buffer de recepción: `rwnd = bufferSize - rxBuffer.getLength()`. Se extrae del parámetro `rwnd` que viaja en los ACKs que llegan a `TransportTx`.
+* **`effectiveWindow` implícita:** No se graba como vector temporal separado, pero está implícita en la condición de envío: `inFlight < min(rwnd, cwnd)`. Cuando `inFlight` frena, es porque una de estas ventanas lo limita.
+
+#### 2. ¿Qué información viaja en el feedback?
+
+Los ACKs generados por `TransportRx` llevan dos parámetros clave:
+
+* **`rwnd`:** El espacio libre del buffer de recepción en ese instante. Se calcula como `freeSlots = bufferSize - rxBuffer.getLength()` justo antes de crear el ACK.
+* **`ecn` (Explicit Congestion Notification):** Una bandera booleana que se marca en `true` si el buffer del receptor alcanza o supera el 80% de ocupación (umbral configurado como `ECN_THRESHOLD`). En `Queue.cc` también se propaga el ECN si viene marcado en el paquete: `ecn = (lenBefore >= (int)(bufferSize * 0.8))`.
+
+Adicionalmente, cada ACK contiene el `kind=ACK_RX`, que permite al transmisor identificar que debe decrementar `inFlight`.
+
+#### 3. ¿Qué condición usa el transmisor para enviar o esperar?
+
+La condición es simple pero efectiva, programada en `trySend()`:
+
+```cpp
+while (inFlight < (int)std::min((double)rwnd, cwnd) && !txBuffer.isEmpty())
+```
+
+**Interpretación:** El transmisor solo envía paquetes si:
+1. El número de paquetes en vuelo (`inFlight`) es **menor que** la ventana efectiva (el mínimo de `rwnd` y `cwnd`).
+2. Hay datos en el buffer local (`txBuffer`).
+3. El canal de salida está libre (si está ocupado, se agenda un reintento).
+
+Cuando se cumple la condición, se incrementa `inFlight`. Cuando llega un ACK, se decrementa. De esta forma, el transmisor nunca envía más paquetes de los que cabe en la ventana efectiva.
+
+#### 4. ¿Cómo detectan congestión?
+
+La detección de congestión ocurre en dos puntos de la red:
+
+* **En la cola intermedia (`Network.queue`):** Cuando un paquete sale de la cola, se marca ECN en `true` si el buffer **antes de sacar el paquete** estaba al 80% o más lleno. Esto lo hace `Queue.cc`: `bool ecn = (lenBefore >= (int)(bufferSize * 0.8))`.
+* **En el receptor (`TransportRx`):** Cuando llega un paquete de datos, se verifica si el buffer local alcanzó el umbral. Si es así, genera un ACK con `ecn=true`: `bool ecn = (rxBuffer.getLength() >= (int)(bufferSize * ECN_THRESHOLD))`.
+
+El transmisor recibe esta información en los ACKs: `bool ecn = msg->hasPar("ecn") && msg->par("ecn").boolValue()`.
+
+#### 5. ¿Cómo cambia cwnd cuando hay congestión y cuando no la hay?
+
+* **Sin congestión (ECN=false):** El `cwnd` crece de forma aditiva:
+  ```cpp
+  cwnd += 1.0 / cwnd;
+  ```
+  Esto es el **crecimiento aditivo** de AIMD (Additive Increase, Multiplicative Decrease). Por cada ACK sin congestión, aumenta lentamente.
+
+* **Con congestión (ECN=true):** El `cwnd` se reduce multiplicativamente:
+  ```cpp
+  cwnd = std::max(1.0, cwnd / 2.0);
+  ```
+  La ventana se corta a la mitad, con piso en 1 paquete para evitar estancamientos.
+
+En los datos experimentales, se observa que en **Caso 1** (sin ECN en la red), `cwnd` crece hasta ~49 paquetes. En **Caso 2** (con ECN detectado), `cwnd` crece más lentamente y se estabiliza en torno a ~45-44 paquetes para `gi=0.1/0.2`, mostrando las reducciones multiplicativas intermitentes.
+
+#### 6. ¿El algoritmo funciona igual para el Caso 1 y el Caso 2? ¿Por qué?
+
+**No, el algoritmo se adapta fundamentalmente según el cuello de botella:**
+
+**Caso 1 (Cuello en el receptor, rxToSinkDatarate = 0.5 Mbps):**
+- La cola intermedia oscila entre 0 y 1 paquete, nunca alcanza el 80%.
+- Por tanto, **nunca se marca ECN** en la red.
+- El `cwnd` crece sin restricción (aditivo puro) hasta que `rwnd` lo limita.
+- El `rwnd` anuncia progresivamente menos espacio conforme el buffer del receptor se llena.
+- El comportamiento es de **control de flujo:** el transmisor se autolimita porque el receptor dice "no tengo más espacio".
+
+**Caso 2 (Cuello en la red, queueToRxDatarate = 0.5 Mbps):**
+- La cola intermedia se llena rápidamente (especialmente para `gi=0.1` y `gi=0.2`), alcanzando el 80%.
+- Se marcan múltiples ECNs en los paquetes que salen de la cola.
+- Los ACKs que regresan traen `ecn=true`.
+- El `cwnd` sufre reducciones multiplicativas, manteniéndose más bajo.
+- El comportamiento es de **control de congestión:** el transmisor es frenado por la red congestionada.
+
+La clave es que el protocolo AIMD responde **automáticamente** a las señales que recibe: sin congestión, crece; con congestión, se retrae. El ambiente (cuello de botella) dicta el comportamiento.
+
+#### 7. ¿Logra reducir o eliminar pérdidas?
+
+**Sí, elimina completamente las pérdidas en ambos casos.**
+
+Las gráficas de descartes en la sección 4.2.2 muestran líneas planas en cero paquetes perdidos para todos los `gi`, mientras que sin control acumulaban cientos de paquetes descartados.
+
+**¿Cómo lo logra?** El transmisor nunca permite que `inFlight` supere la ventana efectiva, lo que previene que los buffers intermedios se desbordes. En **Caso 1** sin control, el receptor llegaba a 200 paquetes y descartaba. Con control, `inFlight` se limita a ~10 paquetes, por lo que el receptor nunca satura (queda cercano a 199 sin llegar a 200). En **Caso 2**, la red no colaps porque el transmisor frena ante ECN.
+
+El **costo** de esta solución es que el buffer del transmisor (`txBuffer`) asume la acumulación que antes causaba pérdidas. En nuestro laboratorio, configuramos `txBuffer` con capacidad de $2 \times 10^6$ paquetes (arbitrariamente alto), por lo que "se aguanta" toda la carga. En un caso real con buffers realistas en el transmisor, esto sería insostenible a largo plazo: habría más demora acumulada y eventual descarte en el origen.
+
+#### 8. ¿Qué costo tiene la solución?
+
+El control por ventanas tiene varios costos que se observan en los resultados:
+
+**a) Mayor retención de paquetes en el transmisor:**
+Como se ve en las gráficas de ocupación (sección 4.2.1), cuando se activa el control, el buffer de `TransportTx` crece significativamente para `gi=0.1` y `gi=0.2`. Es el "precio" que paga el origen para evitar saturar la red o el receptor. En un caso real donde el buffer del transmisor fuera finito (p.ej., 1000 paquetes), esto causaría pérdidas en el origen, lo que sería problemático.
+
+**b) Mayor demora en la entrega:**
+Teóricamente, la demora aumenta porque los paquetes pasan más tiempo encolados en el transmisor esperando ventana. Aunque en nuestros gráficos de demora (no incluidos en el informe pero si dentro de "./graficos) no se aprecia una diferencia notable entre Caso 1 y Caso 2 con control, la demora **sí aumenta** en comparación con un escenario sin embotellamiento. Específicamente:
+- La demora de un paquete es ahora: demora de transmisión + demora por espera en txBuffer + demora de red + demora en receptor.
+- En particular, para cargas altas (`gi=0.1`), los paquetes esperan más tiempo en `txBuffer` antes de poder enviar, incrementando la latencia total.
+
+**c) Subutilización del ancho de banda en cargas bajas:**
+Para `gi \ge 0.5`, donde la red no satura, el control conservador no cambia mucho. Pero el algoritmo AIMD es inherentemente lento para crecer desde scratch (`cwnd` comienza en 1 paquete), por lo que en conexiones largas o con RTT alto, habría un período inicial de "ramp-up" donde no se aprovecha el ancho de banda disponible.
+
+
+#### 9. ¿Qué limitaciones tiene su diseño y cómo podría mejorarse?
+
+**Limitaciones del diseño actual:**
+
+* **Buffer del transmisor sin límite real:** Pusimos `bufferSize = 2e6` para que no sea el cuello de botella. En realidad, cualquier buffer es finito. Si no se limita explícitamente, el transmisor puede acumular indefinidamente y causar problemas de memoria.
+
+* **ECN fijo en 80%:** El umbral de congestión se hardcodea en 80%. En TCP real, se usan múltiples señales y umbrales adaptativos. Un umbral fijo puede no ser óptimo para todas las topologías.
+
+* **Sin retransmisión:** Implementamos ACK por paquete, pero sin mecanismo de retransmisión. Si un paquete se pierde, nunca se recupera. En TCP, habría timeouts y retransmisiones.
+
+* **Sin algoritmo de "slow start":** El `cwnd` inicia en 1 y crece linealmente. TCP moderno usa "slow start" exponencial inicial, que es más eficiente para establecer la ventana rápidamente.
+
+* **Sin "fast recovery":** Ante pérdidas o señales, simplemente se divide `cwnd` a la mitad. TCP puede aprovechar información más granular para recuperarse más rápido.
+
+**Mejoras posibles:**
+
+* **Límite explícito en txBuffer:** Establecer un máximo realista para el buffer del transmisor. Cuando se alcance, descartar o señalar un error hacia la capa de aplicación.
+
+* **Umbrales adaptativos para ECN:** Basarse en historial de ocupación del buffer para ajustar el umbral dinámicamente.
+
+* **Mecanismo de retransmisión con timeout:** Implementar timers para ACKs que no llegan, con reintentos y backoff exponencial.
+
+* **"Slow start" exponencial:** Durante el ramp-up inicial, doblar `cwnd` por cada ACK (en lugar de sumar 1/cwnd).
+
+* **"Fast recovery" con información de paquetes duplicados:** Si llegan múltiples ACKs del mismo número, reduce `cwnd` pero no tanto como una reducción multiplicativa completa.
+
+* **Integración con otros protocolos:** En TCP real, el control de ventanas interactúa con control de flujo del receptor y detección de congestión más sofisticada (como Reno, por ej).
+
+Nuestro diseño es una versión educativa simplificada que captura los conceptos clave de TCP: ventana efectiva, control de flujo vs. control de congestión, AIMD, y ECN. Pero para producción, se requeriría complejidad adicional.
+
 ---
 
 ## 6. Conclusiones
@@ -317,22 +474,30 @@ También vimos que:
 
 Como cierre, el modelo implementado en OMNeT++ resultó consistente con lo esperado por teoría de colas para este tipo de escenarios y permitió ubicar de forma clara dónde se produce el problema en cada caso.
 
+### 6.2. Conclusiones de Análisis Físico (Parte 2)
+
+En la segunda parte del laboratorio pudimos comprobar que el control por ventanas cambia de manera clara el lugar donde se acumula la carga, sin modificar el límite físico de la red. En ambos casos, el algoritmo permitió evitar el colapso de los buffers y eliminar las pérdidas observadas en la parte sin control. La diferencia principal no está en aumentar la capacidad de servicio, sino en regular mejor el envío para que el sistema se mantenga estable.
+
+En el **Caso 1**, donde el cuello de botella estaba en el receptor, el control hizo que el exceso de tráfico dejara de traducirse en pérdidas y pasara a acumularse del lado del transmisor. En el **Caso 2**, donde el problema estaba en la red intermedia, ocurrió lo mismo: la cola de la red dejó de colapsar y la carga se desplazó hacia `TransportTx`, que absorbió la mayor parte de la retención. En ambos escenarios, las gráficas muestran que las variables de control se adaptan al cuello de botella y evitan que los buffers críticos lleguen al límite.
+
+Como resultado, el sistema conserva el mismo orden de rendimiento máximo, pero lo hace de una forma más controlada: sin pérdidas y con colas más estables. Esto confirma que el mecanismo de ventanas cumple su objetivo principal en este trabajo, que era regular el envío y contener la saturación en el punto correcto de la red.
+
 ---
 
 ## 7. Anexo: Uso de Herramientas de Inteligencia Artificial
 
 Para el desarrollo de este laboratorio se emplearon asistentes basados en Modelos de Lenguaje (LLMs).
 
-* **Herramientas utilizadas:** Gemini (Google).
-* **Propósito:** Desarrollo de scripts en Python para la conversión de datos y trazado de gráficas, y consultas sobre el funcionamiento de OMNeT++.
-* **Interacciones relevantes:** Discusión de las gráficas obtenidas y mejoras/correcciones (generación de vistas ampliadas) en los casos donde se presentó aliasing.
+* **Herramientas utilizadas:** Gemini (Google), Copilot. 
+* **Propósito:** Desarrollo de scripts en Python para la conversión de datos y trazado de gráficas, y consultas sobre el funcionamiento de OMNeT++. 
+* **Interacciones relevantes:** Discusión de las gráficas obtenidas y mejoras/correcciones (generación de vistas ampliadas) en los casos donde se presentó aliasing. Además corrección de gráficas mal generadas. 
 * **Validación:** Las gráficas generadas fueron analizadas para ver si realmente coincidían con lo que se esperaba teóricamente que pase.
 
 ---
 
 ## 8. Reproducibilidad de los Experimentos
 
-Para extraer los datos y generar los reportes de la **Parte 1** de forma automatizada, situarse en el directorio raíz del proyecto y ejecutar la siguiente secuencia en una terminal:
+Para extraer los datos y generar los reportes de las **Partes 1 y 2** de forma automatizada, situarse en el directorio raíz del proyecto y ejecutar la siguiente secuencia en una terminal. Los archivos CSV esperados por el análisis son `caso1_sin_control.csv`, `caso2_sin_control.csv`, `caso1_con_control.csv` y `caso2_con_control.csv`.
 
 ```bash
 # 1. Activación del entorno virtual y variables de entorno de OMNeT++
@@ -343,13 +508,25 @@ make
 
 # 3. Limpieza de registros anteriores y ejecución de los casos de estudio en modo consola (Cmdenv)
 rm -rf results/*
+
+# 4. Corridas de la Parte 1 (sin control)
 ./lab3-kickstarter -u Cmdenv -c Caso1
 ./lab3-kickstarter -u Cmdenv -c Caso2
 
-# 4. Extracción de datos vectoriales y escalares hacia archivos CSV
-opp_scavetool export -o caso1.csv results/Caso1-*.vec results/Caso1-*.sca
-opp_scavetool export -o caso2.csv results/Caso2-*.vec results/Caso2-*.sca
+# 5. Extracción de datos vectoriales y escalares hacia los CSV de la Parte 1
+opp_scavetool export -o caso1_sin_control.csv results/Caso1-*.vec results/Caso1-*.sca
+opp_scavetool export -o caso2_sin_control.csv results/Caso2-*.vec results/Caso2-*.sca
 
-# 5. Generación de trazados gráficos y reportes de rendimiento
+# 6. Corridas de la Parte 2 (con control por ventanas activado)
+#    Volver a ejecutar los mismos casos con la versión del código que incorpora rwnd/cwnd/ECN
+rm -rf results/*
+./lab3 -u Cmdenv -c Caso1
+./lab3 -u Cmdenv -c Caso2
+
+# 7. Extracción de datos vectoriales y escalares hacia los CSV de la Parte 2
+opp_scavetool export -o caso1_con_control.csv results/Caso1-*.vec results/Caso1-*.sca
+opp_scavetool export -o caso2_con_control.csv results/Caso2-*.vec results/Caso2-*.sca
+
+# 8. Generación de trazados gráficos y reportes de rendimiento
 python3 analisis.py
 ```

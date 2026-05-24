@@ -75,7 +75,7 @@ module NodeRx
         }
     connections:
         in <--> transport.toOut; //TransportRx manda feedbackQueue y recibe queues
-        transport.toApp --> sink.in; //TransportRx manda datos al sink
+        transport.toApp --> { datarate = parent.rxToSinkDatarate; } --> sink.in; //TransportRx manda datos al sink
 }
 
 network Network
