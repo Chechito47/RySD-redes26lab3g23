@@ -41,7 +41,7 @@ A partir de esta extensión se repitieron los dos casos de estudio de la Parte 1
 
 ## 2. Introducción
 
-### 2.1. Contexto y Objetivos 
+### 2.1. Contexto y Objetivos - Parte 1
 
 En una red de paquetes, el problema de fondo es simple: no siempre se puede enviar datos al ritmo que uno quiere. Si los enlaces tienen tasa limitada y los buffers son finitos, empiezan las colas, las demoras y, eventualmente, las pérdidas.
 
@@ -58,6 +58,8 @@ En la primera parte del trabajo de laboratorio utilizamos la simulación para es
 * Medir demora, ocupación de buffers y pérdida de paquetes.
 * Distinguir entre problemas de control de flujo y problemas de control de congestión.
 * Analizar resultados experimentales y justificar conclusiones en un informe.
+
+### 2.2. Contexto y Objetivos - Parte 2
 
 Ya para la segunda parte se incorporó una estrategia de control por ventanas inspirada en TCP, sin modificar la tasa de generación del emisor. La idea fue que `TransportTx` regule cuántos paquetes puede mantener en vuelo usando una ventana efectiva, para reducir la saturación de buffers y las pérdidas asociadas.
 
@@ -147,6 +149,29 @@ Estas variables permiten describir el mecanismo de control sin entrar todavía e
 
 Además de los elementos obligatorios del modelo, para la Parte 2 se tomaron algunas decisiones de diseño propias para simplificar el mecanismo y hacerlo estable en este laboratorio. En particular, se adoptó `ACK` por paquete, una reducción multiplicativa de `cwnd` ante congestión, y una actualización directa de `rwnd` a partir del estado del receptor. También se evitó implementar retransmisión, ya que el objetivo principal fue regular el envío para prevenir pérdidas y no recuperarlas después.
 
+Para más información y detalle sobre estas elecciones, se puede consultar el archivo [Decisiones de diseño](Decisiones%20de%20diseño).
+
+### 3.5. Definición del Escenario de Competición
+
+A modo de discutir los trade-offs entre pérdida, demora, utilización y estabilidad de los algoritmos implementados, se agregó una nueva configuración `[Config Competicion]` en el archivo `omnetpp.ini`. Este escenario oficial combina presión sobre la red intermedia y sobre el receptor simultáneamente, evaluándose con un intervalo de generación específico ($gi = 0.1\text{ s}$).
+
+Los parámetros estipulados para este escenario son:
+
+| Parámetro | Valor |
+|---|---|
+| Tiempo de simulación | $200\text{ s}$ |
+| Tamaño de paquete | $12{,}500\text{ Bytes}$ ($100{,}000\text{ bits}$) |
+| Intervalo medio de generación ($gi$) | $0.1\text{ s}$ (exponencial) |
+| Tamaño del buffer transmisor | $2 \times 10^6$ paquetes |
+| Tamaño del buffer intermedio (`queue`) | $100$ paquetes |
+| Tamaño del buffer de feedback | $1000$ paquetes |
+| Tamaño del buffer receptor | $100$ paquetes |
+| Datarate `txToQueue` | $1\text{ Mbps}$ |
+| Datarate `queueToRx` | $0.5\text{ Mbps}$ |
+| Datarate `rxToSink` | $0.5\text{ Mbps}$ |
+| Datarate `feedback` | $1\text{ Mbps}$ |
+| Delay de enlaces | $100\ \mu\text{s}$ |
+
 
 ---
 
@@ -235,18 +260,22 @@ En la segunda parte se reutilizaron los mismos parámetros y los mismos dos caso
 ![Caso 1 - Grid 3x2 (Tx/Queue/Rx) Sin/Con](graficos/Parte2_Caso1_Grid3x2.png)
 ![Caso 1 - Zoom gi=0.1 (Tx vs Rx)](graficos/Parte2_Caso1_Zoom_gi01_Tx_Rx.png)
 
-> **Observación:** En las gráficas revisadas, el `nodeRx` (receptor) oscila entre 0 y 1 paquete y no muestra acumulación sostenida: el receptor, en sí, no presenta problema de desbordo.
-> Por el contrario, la cola de la red intermedia sí muestra comportamiento crítico cuando el control está desactivado: sin control la `Network.queue` colapsa alcanzando el límite de **200 paquetes** y se observan pérdidas acumuladas. Cuando se activa el control por ventanas, las curvas correspondientes a $gi=0.1$ y $gi=0.2$ quedan casi superpuestas; ambas empiezan a llenar la cola pero NO llegan al techo físico de 200 paquetes. En ese escenario con control, el exceso de carga se desplaza hacia el buffer del transmisor (`TransportTx`), que retiene más paquetes (lo que se traduce en pendientes mayores en la curva de ocupación del transmisor) porque el envío efectivo se hace más lento.
-> En la comparativa de throughput esa transferencia de carga se aprecia claramente: gracias al control por ventanas la red intermedia deja de colapsar aunque parte de la carga se acumule en el transmisor.
+> **Observación:** En el Caso 1 (enfocado en el **Control de Flujo**), la cola intermedia de la red (`Network.queue`) oscila entre 0 y 1 paquete sin mostrar acumulación sostenida. Esto ocurre porque la velocidad máxima de llegada a la cola y su velocidad de salida hacia el receptor están balanceadas en **1 Mbps**. El cuello de botella real de este escenario está en la tasa de extracción en el destino ($0.5\text{ Mbps}$).
+>
+> En las ejecuciones **sin control**, observamos que para las inyecciones de tráfico más altas ($gi=0.1$ y $gi=0.2$), el buffer del receptor colapsa velozmente contra su límite físico de **200 paquetes**, lo que se traduce de forma directa en descartes masivos.
+>
+> Por el contrario, al aplicar el **algoritmo de control**, se aprecia un cambio de pendiente (quiebre) muy notorio en las gráficas de ocupación de buffers. El origen (`TransportTx`) se hace cargo de la contención: empieza a acumular localmente los paquetes para compensar la velocidad de la red y evitar ahogar al extremo receptor. Gracias a que el transmisor retiene la carga, se logra que el receptor opere justo por debajo del límite de saturación (alcanzando un máximo seguro de **199 paquetes**). Como veremos más adelante, este desplazamiento planificado de la limitación se traduce en que la tasa de paquetes perdidos caiga a cero absoluto.
 
 ##### Caso 2: Sin control vs. con control
 
 ![Caso 2 - Grid 3x2 (Tx/Queue/Rx) Sin/Con](graficos/Parte2_Caso2_Grid3x2.png)
 ![Caso 2 - Zoom gi=0.1 (Tx vs Queue)](graficos/Parte2_Caso2_Zoom_gi01_Tx_Queue.png)
 
-> **Observación:** En la subred intermedia, el cuello de botella en $0.5\text{ Mbps}$ pone de manifiesto por qué hace falta control de congestión.
-> En las ejecuciones sin control la `Network.queue` colapsa (llegando al límite de 200 paquetes y generando pérdidas). Con control, en cambio, las curvas de $gi=0.1$ y $gi=0.2$ quedan prácticamente superpuestas: ambas comienzan a llenar la cola pero no alcanzan el límite de 200 paquetes. El efecto observado es que el transmisor (`TransportTx`) asume la acumulación: su buffer crece con pendientes mayores porque envía a menor ritmo efectivo.
-> Por tanto, al activar `cwnd` la red intermedia deja de colapsar y se reduce la pérdida, aunque ello implique mayor retención temporal en el transmisor; esto es claramente visible en la comparativa de throughput.
+> **Observación:** En el Caso 2 (enfocado en el **Control de Congestión**), el escenario cambia y la restricción principal se encuentra directamente en la subred intermedia. El cuello de botella físico ocurre porque el enlace de salida de la cola intermedia (`queueToRx`) está estrangulado a **0.5 Mbps**, una velocidad insuficiente para desagotar el tráfico de las inyecciones más veloces.
+> 
+> En las ejecuciones **sin control**, observamos que ante cargas altas ($gi=0.1$ y $gi=0.2$), la cola de la red (`Network.queue`) se ve rápidamente desbordada, colapsando de forma sostenida contra su límite físico de **200 paquetes**, lo que provoca pérdida de paquetes, como vimos en la experimentación anterior.
+> 
+> Por el contrario, al activar el **algoritmo de control** (regulado por la ventana `cwnd`), notamos un cambio en la dinámica. El transmisor (`TransportTx`) percibe las señales de congestión y retiene la demanda en sus colas: sus gráficas toman pendientes de ocupación mucho mayores porque frena el envío. Al hacerse cargo temporalmente de esta acumulación, logra descomprimir la red intermedia mitigando el problema (vemos que las curvas de ocupación para $gi=0.1$ y $gi=0.2$ se solapan en un punto más alto pero jamás alcanzan el limite de 200 paquetes). Nuevamente, esta contención guiada desde el emisor permite reducir las pérdidas completamente a cero.
 
 #### 4.2.2. Pérdidas de Paquetes
 
@@ -264,7 +293,7 @@ En la segunda parte se reutilizaron los mismos parámetros y los mismos dos caso
 
 ![Parte 2 - Throughput 4 Curvas](graficos/Parte2_Throughput_4Curvas_Comparativo.png)
 
-> **Interpretación de Resultados:** 
+> **Observaciones:** 
 > Como se evidencia en la gráfica, el Algoritmo de Control de Ventanas no incrementa el límite físico de transmisión (todas las curvas saturan asintóticamente en 5 pkt/s). Sin embargo, el éxito del algoritmo introducido en la Parte 2 radica en cómo se alcanza ese límite: mientras que los Casos Sin Control logran 5 pkt/s colapsando las memorias intermedias y perdiendo cientos de paquetes, los Casos Con Control sostienen el mismo Goodput máximo histórico, pero garantizando cero pérdidas y colas descongestionadas en la red, optimizando el comportamiento del sistema global.
 
 
@@ -321,7 +350,7 @@ Nos basamos en tres evidencias claras:
 
 #### 1. ¿Cómo implementaron rwnd, cwnd y effectiveWindow?
 
-La ventana efectiva (`effectiveWindow`) es el concepto central del protocolo. Se implementa como:
+La ventana efectiva (`effectiveWindow`) se implementa como:
 
 $$
 \text{effectiveWindow} = \min(\text{cwnd}, \text{rwnd})
@@ -330,7 +359,7 @@ $$
 donde:
 * **`cwnd` (Congestion Window):** Inicializa en 1 paquete y está bajo control del transmisor. Crece de forma aditiva cuando no hay congestión (`cwnd += 1/cwnd` por ACK recibido sin ECN) y se reduce multiplicativamente cuando se detecta congestión (`cwnd = cwnd / 2`). En el código de `TransportTx.cc` se ve claramente en la función `handleMessage()`.
 * **`rwnd` (Receiver Window):** El receptor la anuncia en cada ACK. Se calcula como el espacio libre en el buffer de recepción: `rwnd = bufferSize - rxBuffer.getLength()`. Se extrae del parámetro `rwnd` que viaja en los ACKs que llegan a `TransportTx`.
-* **`effectiveWindow` implícita:** No se graba como vector temporal separado, pero está implícita en la condición de envío: `inFlight < min(rwnd, cwnd)`. Cuando `inFlight` frena, es porque una de estas ventanas lo limita.
+* **`effectiveWindow` implícita:** Está implícita en la condición de envío: `inFlight < min(rwnd, cwnd)`. Cuando `inFlight` frena, es porque una de estas ventanas lo limita.
 
 #### 2. ¿Qué información viaja en el feedback?
 
@@ -343,13 +372,13 @@ Adicionalmente, cada ACK contiene el `kind=ACK_RX`, que permite al transmisor id
 
 #### 3. ¿Qué condición usa el transmisor para enviar o esperar?
 
-La condición es simple pero efectiva, programada en `trySend()`:
+La condición se encuentra programada en `trySend()`:
 
 ```cpp
 while (inFlight < (int)std::min((double)rwnd, cwnd) && !txBuffer.isEmpty())
 ```
 
-**Interpretación:** El transmisor solo envía paquetes si:
+El transmisor solo envía paquetes si:
 1. El número de paquetes en vuelo (`inFlight`) es **menor que** la ventana efectiva (el mínimo de `rwnd` y `cwnd`).
 2. Hay datos en el buffer local (`txBuffer`).
 3. El canal de salida está libre (si está ocupado, se agenda un reintento).
@@ -491,7 +520,7 @@ Para el desarrollo de este laboratorio se emplearon asistentes basados en Modelo
 * **Herramientas utilizadas:** Gemini (Google), Copilot. 
 * **Propósito:** Desarrollo de scripts en Python para la conversión de datos y trazado de gráficas, y consultas sobre el funcionamiento de OMNeT++. 
 * **Interacciones relevantes:** Discusión de las gráficas obtenidas y mejoras/correcciones (generación de vistas ampliadas) en los casos donde se presentó aliasing. Además corrección de gráficas mal generadas. 
-* **Validación:** Las gráficas generadas fueron analizadas para ver si realmente coincidían con lo que se esperaba teóricamente que pase.
+* **Validación:** Las gráficas generadas fueron analizadas para ver si realmente coincidían con lo que se esperaba teóricamente que pase (y corregidas múltiples veces, así que se pide disculpas por la cantidad de basura dentro de la carpeta "gráficos"). 
 
 ---
 
@@ -529,13 +558,14 @@ opp_scavetool export -o caso2_con_control.csv results/Caso2-*.vec results/Caso2-
 
 # 8. Generación de trazados gráficos y reportes de rendimiento
 python3 analisis.py
+python3 analisis.py parte2
 ```
 
 ---
 
 ## 9. Competición: Escenario oficial
 
-A continuación se presenta la tabla con los resultados oficiales de la competición, tras realizar los cálculos correspondientes con la "receta" indicada y a partir de nuestro archivo local de resultados `Competicion-0.sca` (correspondiente a `gi=0.1`):
+A continuación se presenta la tabla con los resultados oficiales de la competición a partir de nuestro archivo local de resultados `Competicion-0.sca` (correspondiente a `gi=0.1`):
 
 | Grupo | goodput (pkt/s) | lossRate (%) | avgDelay (s) | stability (pkt) |
 |---|---|---|---|---|
