@@ -530,3 +530,22 @@ opp_scavetool export -o caso2_con_control.csv results/Caso2-*.vec results/Caso2-
 # 8. Generación de trazados gráficos y reportes de rendimiento
 python3 analisis.py
 ```
+
+---
+
+## 9. Competición: Escenario oficial
+
+A continuación se presenta la tabla con los resultados oficiales de la competición, tras realizar los cálculos correspondientes con la "receta" indicada y a partir de nuestro archivo local de resultados `Competicion-0.sca` (correspondiente a `gi=0.1`):
+
+| Grupo | goodput (pkt/s) | lossRate (%) | avgDelay (s) | stability (pkt) |
+|---|---|---|---|---|
+| Grupo 23 | 4.985 | 0.00 | 60.566269 | 10.479117 |
+
+<br>
+
+**Resultados obtenidos:**<br>
+Los resultados del escenario de competición (con alta inyección de tráfico, $gi = 0.1$) muestran claramente cómo nuestro algoritmo prioriza la confiabilidad por sobre la latencia. Al registrar un 0% de pérdidas, queda en evidencia que el emisor retiene el exceso de paquetes en su propio buffer en lugar de saturar la red. Como consecuencia directa de esta acumulación preventiva, el tiempo que los paquetes esperan antes de salir dispara la demora promedio a unos 60.5 segundos. 
+
+En cuanto al rendimiento, logramos aprovechar prácticamente todo el ancho de banda disponible. El *goodput* de 4.985 pkt/s está apenas por debajo del límite teórico del enlace más lento (5 pkt/s). Para sostener este nivel de utilización sin provocar congestiones severas ni descartes, el tamaño de la ventana efectiva se adapta de forma continua, lo que explica la medición de estabilidad cercana a 10.5.
+
+En conclusión, desarrollamos un protocolo orientado a transferencias masivas donde lo principal es asegurar la entrega completa de los datos. Aunque el enorme retraso lo vuelve inviable para aplicaciones interactivas o en tiempo real, es una solución muy sólida para mover grandes volúmenes de información aprovechando al máximo la capacidad del canal sin sufrir pérdidas.
