@@ -526,6 +526,15 @@ Para el desarrollo de este laboratorio se emplearon asistentes basados en Modelo
 
 ## 8. Reproducibilidad de los Experimentos
 
+El repositorio usa tags para marcar los estados correspondientes a cada parte del laboratorio. Posiionarse en el tag correspondiente antes de compilar y ejecutar
+
+| Tag | Contenido |
+|---|---|
+| `v0.1-parte1` | Modelo sin control (Parte 1) |
+| `v1.0-final` | Modelo con control por ventanas (Parte 2) |
+
+Los archivos CSV esperados por el análisis son `caso1_sin_control.csv`, `caso2_sin_control.csv`, `caso1_con_control.csv` y `caso2_con_control.csv`. Los gráficos generados quedan en `./graficos/`.
+
 Para extraer los datos y generar los reportes de las **Partes 1 y 2** de forma automatizada, situarse en el directorio raíz del proyecto y ejecutar la siguiente secuencia en una terminal. Los archivos CSV esperados por el análisis son `caso1_sin_control.csv`, `caso2_sin_control.csv`, `caso1_con_control.csv` y `caso2_con_control.csv`.
 
 ```bash
