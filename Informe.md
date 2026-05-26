@@ -601,6 +601,13 @@ A continuación se presenta la tabla con los resultados oficiales de la competic
 |---|---|---|---|---|
 | Grupo 23 | 4.985 | 0.00 | 60.566269 | 10.479117 |
 
+
+Comando utilizado para obtener estos resultados:
+
+```bash
+./lab3 -u Cmdenv -c Competicion
+``` 
+
 <br>
 
 **Resultados obtenidos:**<br>
