@@ -149,7 +149,7 @@ Estas variables permiten describir el mecanismo de control sin entrar todavía e
 
 Además de los elementos obligatorios del modelo, para la Parte 2 se tomaron algunas decisiones de diseño propias para simplificar el mecanismo y hacerlo estable en este laboratorio. En particular, se adoptó `ACK` por paquete, una reducción multiplicativa de `cwnd` ante congestión, y una actualización directa de `rwnd` a partir del estado del receptor. También se evitó implementar retransmisión, ya que el objetivo principal fue regular el envío para prevenir pérdidas y no recuperarlas después.
 
-Para más información y detalle sobre estas elecciones, se puede consultar el archivo [Decisiones de diseño](Decisiones%20de%20diseño).
+Para más información y detalle sobre estas elecciones, se puede consultar el archivo [Decisiones de diseño](Decisiones%20de%20diseño.md).
 
 ### 3.5. Definición del Escenario de Competición
 

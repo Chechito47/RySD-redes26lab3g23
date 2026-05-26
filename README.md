@@ -2,7 +2,7 @@
 
 **Grupo 23** · Álvarez Lis Ailín · Pinilla Lautaro · Sabino Lucas  
 Informe académico: [`Informe.md`](Informe.md)  
-Decisiones de diseño (Parte 2): [`Decisiones de diseño`](Decisiones%20de%20diseño)
+Decisiones de diseño (Parte 2): [Decisiones de diseño](Decisiones%20de%20diseño.md)
 
 ---
 
