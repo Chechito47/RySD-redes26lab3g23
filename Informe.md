@@ -537,37 +537,58 @@ Los archivos CSV esperados por el análisis son `caso1_sin_control.csv`, `caso2_
 
 Para extraer los datos y generar los reportes de las **Partes 1 y 2** de forma automatizada, situarse en el directorio raíz del proyecto y ejecutar la siguiente secuencia en una terminal. Los archivos CSV esperados por el análisis son `caso1_sin_control.csv`, `caso2_sin_control.csv`, `caso1_con_control.csv` y `caso2_con_control.csv`.
 
-```bash
-# 1. Activación del entorno virtual y variables de entorno de OMNeT++
-source ~/omnetpp-6.3.0/setenv
+### Parte 1 (tag `v0.1-parte`)
 
-# 2. Compilación del modelo fuente C++
+
+```bash
+# 1. Posicionarse en el tag de la Parte 1
+git checkout v0.1-parte1
+
+# 2. Activación de variables de entorno de OMNeT++ y compilación
+source ~/omnetpp-6.3.0/setenv
 make
 
-# 3. Limpieza de registros anteriores y ejecución de los casos de estudio en modo consola (Cmdenv)
-rm -rf results/*
-
-# 4. Corridas de la Parte 1 (sin control)
-./lab3-kickstarter -u Cmdenv -c Caso1
-./lab3-kickstarter -u Cmdenv -c Caso2
-
-# 5. Extracción de datos vectoriales y escalares hacia los CSV de la Parte 1
-opp_scavetool export -o caso1_sin_control.csv results/Caso1-*.vec results/Caso1-*.sca
-opp_scavetool export -o caso2_sin_control.csv results/Caso2-*.vec results/Caso2-*.sca
-
-# 6. Corridas de la Parte 2 (con control por ventanas activado)
-#    Volver a ejecutar los mismos casos con la versión del código que incorpora rwnd/cwnd/ECN
+# 3. Limpieza de registros anteriores y corridas de los casos de estudio
 rm -rf results/*
 ./lab3 -u Cmdenv -c Caso1
 ./lab3 -u Cmdenv -c Caso2
 
-# 7. Extracción de datos vectoriales y escalares hacia los CSV de la Parte 2
+# 4. Extracción de datos vectoriales y escalares hacia los CSV
+opp_scavetool export -o caso1_sin_control.csv results/Caso1-*.vec results/Caso1-*.sca
+opp_scavetool export -o caso2_sin_control.csv results/Caso2-*.vec results/Caso2-*.sca
+
+# 5. Generación de gráficos y reportes
+python3 analisis.py
+```
+
+### Parte 2 (tag `v1.0-final`)
+
+```bash
+# 1. Posicionarse en el tag de la Parte 2
+git checkout v1.0-final
+
+# 2. Activación de variables de entorno de OMNeT++ y compilación
+source ~/omnetpp-6.3.0/setenv
+make
+
+# 3. Limpieza de registros anteriores y corridas de los casos de estudio
+rm -rf results/*
+./lab3 -u Cmdenv -c Caso1
+./lab3 -u Cmdenv -c Caso2
+
+# 4. Extracción de datos vectoriales y escalares hacia los CSV
 opp_scavetool export -o caso1_con_control.csv results/Caso1-*.vec results/Caso1-*.sca
 opp_scavetool export -o caso2_con_control.csv results/Caso2-*.vec results/Caso2-*.sca
 
-# 8. Generación de trazados gráficos y reportes de rendimiento
-python3 analisis.py
+# 5. Generación de gráficos y reportes
 python3 analisis.py parte2
+```
+
+### Escenario de competición (tag `v1.0-final`)
+```bash
+rm -rf results/*
+./lab3 -u Cmdenv -c Competicion
+opp_scavetool export -o competicion.csv results/Competicion-*.vec results/Competicion-*.sca
 ```
 
 ---
